@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+  <!-- 頂部導覽與分頁切換 -->
+  <header
+    class="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-4 shadow-sm">
+    <div class="flex items-center gap-2">
+      <button id="tab-btn-editor" type="button" onclick="switchTab('editor')"
+        class="px-4 py-2 rounded-lg text-sm font-bold transition bg-indigo-600 text-white shadow-sm">
+        📝 題目編輯器
+      </button>
+      <button id="tab-btn-drive" type="button" onclick="switchTab('drive')"
+        class="px-4 py-2 rounded-lg text-sm font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200">
+        🖼️ Drive 圖片庫與快速改名
+      </button>
+    </div>
+
+    <div id="status-pill" class="hidden text-xs font-semibold px-3 py-1.5 rounded-full"></div>
+  </header>
+
+  <!-- 主內容 -->
+  <main class="flex-1 p-5 max-w-5xl w-full mx-auto space-y-5">
+    <!-- ==================== 分頁 1：題目編輯器 ==================== -->
+    <section id="tab-editor" class="space-y-4">
+      <!-- 載入/新增模式與基本資訊 -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">編輯模式</label>
+            <select id="ed-mode-select"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-indigo-500 focus:outline-none">
+              <option value="__new__">➕ 新增題目</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">題目 ID（例：Q08、M04）</label>
+            <input id="ed-id" type="text" placeholder="Q08"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">題型</label>
+            <select id="ed-type"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-indigo-500 focus:outline-none">
+              <option value="choice">選擇題 (choice)</option>
+              <option value="match">連連看 (match)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 圖片命名提示卡 -->
+        <div id="naming-hint-box"
+          class="rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-900 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <span>💡 Drive 圖片命名建議提示（依據目前題號與題型即時產生）</span>
+          </div>
+          <div id="naming-hint-content" class="font-mono text-[11px] leading-relaxed text-indigo-800"></div>
+        </div>
+
+        <!-- 題目文字與題目附圖 -->
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">題目敘述文字 *</label>
+            <textarea id="ed-question-text" rows="2" placeholder="請輸入題目問題..."
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">題目附圖網址（選填，支援 Drive 連結）</label>
+            <div class="flex gap-2">
+              <input id="ed-question-image" type="text" placeholder="https://drive.google.com/file/d/.../view"
+                class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              <button type="button" onclick="openPickerFor('ed-question-image')"
+                class="shrink-0 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200">
+                📁 從 Drive 挑選
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 選擇題選項編輯區 -->
+      <div id="ed-choice-area" class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-700">選擇題選項設定（請勾選正確答案）</h3>
+        </div>
+        <div id="ed-choice-list" class="space-y-2.5"></div>
+      </div>
+
+      <!-- 連連看配對編輯區 -->
+      <div id="ed-match-area" class="hidden bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-700">連連看配對設定（至少 2 組）</h3>
+          <button type="button" onclick="addMatchPairRow()"
+            class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100">
+            ➕ 新增一組配對
+          </button>
+        </div>
+        <div id="ed-match-list" class="space-y-2.5"></div>
+      </div>
+
+      <!-- 儲存按鈕列 -->
+      <div class="flex items-center justify-end gap-3 pt-1">
+        <button type="button" onclick="resetEditorToNew()"
+          class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100">
+          清空重填
+        </button>
+        <button id="save-question-btn" type="button" onclick="saveCurrentQuestion()"
+          class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50">
+          💾 儲存題目到 Questions 工作表
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== 分頁 2：Drive 圖片庫與快速改名 ==================== -->
+    <section id="tab-drive" class="hidden space-y-4">
+      <!-- 資料夾設定與操作列 -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <label class="block text-xs font-bold text-slate-500">Google Drive 題庫資料夾網址或 ID（將自動儲存至 Settings 工作表的
+          drive_folder_id）</label>
+        <div class="flex flex-wrap gap-2">
+          <input id="drive-folder-input" type="text"
+            placeholder="貼上資料夾網址 https://drive.google.com/drive/folders/... 或純 ID"
+            class="flex-1 min-w-[260px] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+          <button id="load-drive-btn" type="button" onclick="loadDriveImages(true)"
+            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+            🔄 儲存並載入圖片
+          </button>
+          <button id="sync-drive-btn" type="button" onclick="syncDriveToSheet()"
+            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+            ⚡ 依檔名一鍵同步至 Questions
+          </button>
+        </div>
+        <div id="drive-folder-meta" class="text-xs text-slate-500"></div>
+      </div>
+
+      <!-- 主體：左側圖片列表 + 右側快速改名工具 -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- 圖片清單 -->
+        <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-700">資料夾圖片清單</h3>
+            <span id="drive-img-count" class="text-xs text-slate-400">尚未載入</span>
+          </div>
+          <div id="drive-image-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-1">
+            <div class="col-span-full text-center py-12 text-sm text-slate-400">
+              請先輸入 Drive 資料夾 ID 並點擊「儲存並載入圖片」
+            </div>
+          </div>
+        </div>
+
+        <!-- 快速改名生成器 -->
+        <div
+          class="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3 h-fit sticky top-20">
+          <h3 class="text-sm font-bold text-slate-700 border-b border-slate-100 pb-2">✏️ 快速改名工具</h3>
+
+          <div id="rename-empty-hint" class="py-10 text-center text-xs text-slate-400">
+            請在左側點選任一張圖片，即可快速套用問答命名規範並重新命名。
+          </div>
+
+          <div id="rename-form" class="hidden space-y-3">
+            <div class="flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <img id="rn-thumb" src="" alt=""
+                class="w-14 h-14 object-cover rounded-md bg-white border border-slate-200 shrink-0" />
+              <div class="min-w-0">
+                <div class="text-[11px] text-slate-400">目前檔名</div>
+                <div id="rn-old-name" class="text-xs font-bold text-slate-700 truncate"></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-500 mb-1">題型前綴</label>
+                <select id="rn-prefix" onchange="updateRenamePreview()"
+                  class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
+                  <option value="Q">選擇題 (Q)</option>
+                  <option value="M">連連看 (M)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-500 mb-1">題號（例：01）</label>
+                <input id="rn-num" type="text" value="01" oninput="updateRenamePreview()"
+                  class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-mono" />
+              </div>
+            </div>
+
+            <!-- 選擇題角色 -->
+            <div id="rn-choice-roles" class="space-y-2">
+              <label class="block text-[11px] font-bold text-slate-500">圖片角色</label>
+              <select id="rn-choice-role" onchange="updateRenamePreview()"
+                class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
+                <option value="Q">Q — 題目附圖</option>
+                <option value="A">A — 選項 A</option>
+                <option value="B">B — 選項 B</option>
+                <option value="C">C — 選項 C</option>
+                <option value="D">D — 選項 D</option>
+              </select>
+              <label id="rn-ok-wrap"
+                class="hidden flex items-center gap-2 text-xs font-semibold text-emerald-700 cursor-pointer">
+                <input id="rn-is-ok" type="checkbox" onchange="updateRenamePreview()"
+                  class="rounded border-slate-300 text-emerald-600" />
+                標記此選項為正確答案 (_OK)
+              </label>
+            </div>
+
+            <!-- 連連看角色 -->
+            <div id="rn-match-roles" class="hidden grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-500 mb-1">配對組別 / 題目</label>
+                <select id="rn-match-group" onchange="updateRenamePreview()"
+                  class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
+                  <option value="Q">Q (題目附圖)</option>
+                  <option value="P1">P1 (第 1 組)</option>
+                  <option value="P2">P2 (第 2 組)</option>
+                  <option value="P3">P3 (第 3 組)</option>
+                  <option value="P4">P4 (第 4 組)</option>
+                  <option value="P5">P5 (第 5 組)</option>
+                </select>
+              </div>
+              <div id="rn-match-side-wrap">
+                <label class="block text-[11px] font-bold text-slate-500 mb-1">左 / 右側</label>
+                <select id="rn-match-side" onchange="updateRenamePreview()"
+                  class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
+                  <option value="L">L (左側項目)</option>
+                  <option value="R">R (右側項目)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">補充文字（選填，將自動移除底線 _）</label>
+              <input id="rn-label" type="text" placeholder="例如：積雨雲 或 電流" oninput="updateRenamePreview()"
+                class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs" />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">預覽新檔名（可手動微調）</label>
+              <input id="rn-new-name" type="text"
+                class="w-full rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-2 text-xs font-mono font-bold text-indigo-900" />
+            </div>
+
+            <button id="rn-submit-btn" type="button" onclick="submitRenameFile()"
+              class="w-full rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+              ✅ 確認修改 Drive 檔名
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Drive 圖片挑選彈窗 (供題目編輯器使用) -->
+  <div id="picker-modal"
+    class="fixed inset-0 z-40 hidden bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+        <h4 class="text-sm font-bold text-slate-800">📁 從 Drive 題庫資料夾挑選圖片</h4>
+        <button type="button" onclick="closePicker()"
+          class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+      </div>
+      <div id="picker-body" class="p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_TAB = '<?= initialTab ?>' || 'editor';
+
+    const state = {
+      settings: {},
+      questions: [],
+      driveImages: [],
+      selectedFile: null,
+      pickerTargetInputId: null
+    };
+
+    // =========================================================================
+    // 初始化與頁籤切換
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', function () {
+      switchTab(INITIAL_TAB);
+      initChoiceRows();
+      initMatchRows();
+      bindEditorEvents();
+      loadInitData();
+    });
+
+    function switchTab(tab) {
+      const isEditor = tab === 'editor';
+      document.getElementById('tab-editor').classList.toggle('hidden', !isEditor);
+      document.getElementById('tab-drive').classList.toggle('hidden', isEditor);
+
+      document.getElementById('tab-btn-editor').className = isEditor
+        ? 'px-4 py-2 rounded-lg text-sm font-bold transition bg-indigo-600 text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200';
+
+      document.getElementById('tab-btn-drive').className = !isEditor
+        ? 'px-4 py-2 rounded-lg text-sm font-bold transition bg-indigo-600 text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200';
+    }
+
+    function showStatus(msg, type) {
+      const pill = document.getElementById('status-pill');
+      pill.textContent = msg;
+      pill.classList.remove('hidden', 'bg-slate-100', 'text-slate-600', 'bg-emerald-100', 'text-emerald-700', 'bg-rose-100', 'text-rose-700');
+      if (type === 'success') {
+        pill.classList.add('bg-emerald-100', 'text-emerald-700');
+      } else if (type === 'error') {
+        pill.classList.add('bg-rose-100', 'text-rose-700');
+      } else {
+        pill.classList.add('bg-slate-100', 'text-slate-600');
+      }
+      if (type !== 'loading') {
+        setTimeout(function () {
+          pill.classList.add('hidden');
+        }, 4000);
+      }
+    }
+
+    function loadInitData() {
+      showStatus('讀取試算表資料中...', 'loading');
+      google.script.run
+        .withSuccessHandler(function (data) {
+          state.settings = data.settings || {};
+          state.questions = data.questions || [];
+
+          const folderInput = document.getElementById('drive-folder-input');
+          if (state.settings.drive_folder_id) {
+            folderInput.value = state.settings.drive_folder_id;
+            loadDriveImages(false);
+          }
+
+          populateQuestionSelect();
+          resetEditorToNew();
+          showStatus('資料載入完成', 'success');
+        })
+        .withFailureHandler(function (err) {
+          showStatus('讀取失敗：' + err.message, 'error');
+        })
+        .getEditorInitData();
+    }
+
+    // =========================================================================
+    // 分頁 1：題目編輯器邏輯
+    // =========================================================================
+    function bindEditorEvents() {
+      document.getElementById('ed-mode-select').addEventListener('change', function (e) {
+        const val = e.target.value;
+        if (val === '__new__') {
+          resetEditorToNew();
+        } else {
+          const found = state.questions.find(function (q) { return q.id === val; });
+          if (found) loadQuestionIntoEditor(found);
+        }
+      });
+
+      document.getElementById('ed-id').addEventListener('input', updateNamingHints);
+      document.getElementById('ed-type').addEventListener('change', function () {
+        toggleEditorTypeArea();
+        updateNamingHints();
+      });
+    }
+
+    function populateQuestionSelect() {
+      const sel = document.getElementById('ed-mode-select');
+      const currentVal = sel.value;
+      sel.innerHTML = '<option value="__new__">➕ 新增題目</option>';
+      state.questions.forEach(function (q) {
+        const opt = document.createElement('option');
+        opt.value = q.id;
+        opt.textContent = '✏️ [' + q.id + '] ' + (q.question_text || '').slice(0, 28);
+        sel.appendChild(opt);
+      });
+      if (currentVal && Array.from(sel.options).some(function (o) { return o.value === currentVal; })) {
+        sel.value = currentVal;
+      }
+    }
+
+    function suggestNextId(type) {
+      const prefix = type === 'match' ? 'M' : 'Q';
+      let maxNum = 0;
+      state.questions.forEach(function (q) {
+        const m = String(q.id || '').match(new RegExp('^' + prefix + '(\\d+)$', 'i'));
+        if (m) {
+          maxNum = Math.max(maxNum, Number(m[1]));
+        }
+      });
+      return prefix + String(maxNum + 1).padStart(2, '0');
+    }
+
+    function resetEditorToNew() {
+      document.getElementById('ed-mode-select').value = '__new__';
+      const type = document.getElementById('ed-type').value || 'choice';
+      document.getElementById('ed-id').value = suggestNextId(type);
+      document.getElementById('ed-question-text').value = '';
+      document.getElementById('ed-question-image').value = '';
+      initChoiceRows();
+      initMatchRows();
+      toggleEditorTypeArea();
+      updateNamingHints();
+    }
+
+    function loadQuestionIntoEditor(q) {
+      document.getElementById('ed-id').value = q.id;
+      document.getElementById('ed-type').value = q.type;
+      document.getElementById('ed-question-text').value = q.question_text || '';
+      document.getElementById('ed-question-image').value = q.question_image || '';
+      toggleEditorTypeArea();
+      updateNamingHints();
+
+      if (q.type === 'choice' && q.content) {
+        initChoiceRows(q.content.options, q.content.answer);
+      } else if (q.type === 'match' && q.content) {
+        initMatchRows(q.content.pairs);
+      }
+    }
+
+    function toggleEditorTypeArea() {
+      const type = document.getElementById('ed-type').value;
+      document.getElementById('ed-choice-area').classList.toggle('hidden', type !== 'choice');
+      document.getElementById('ed-match-area').classList.toggle('hidden', type !== 'match');
+    }
+
+    function updateNamingHints() {
+      const id = (document.getElementById('ed-id').value || 'Q01').trim();
+      const type = document.getElementById('ed-type').value;
+      const box = document.getElementById('naming-hint-content');
+
+      if (type === 'choice') {
+        box.innerHTML =
+          '• 題目附圖：<b>' + id + '_Q_題目文字.png</b>（或 ' + id + '_Q.png）<br/>' +
+          '• 一般選項：<b>' + id + '_A_選項文字.png</b>、<b>' + id + '_C.png</b>、<b>' + id + '_D.png</b><br/>' +
+          '• 正解選項：<b>' + id + '_B_OK_正解文字.png</b>（加上 <b>_OK</b> 即自動標記為正解）';
+      } else {
+        box.innerHTML =
+          '• 題目附圖：<b>' + id + '_Q_題目說明.png</b>（選填）<br/>' +
+          '• 第 1 組配對：<b>' + id + '_P1_L_左側文字.png</b> ↔ <b>' + id + '_P1_R_右側文字.png</b><br/>' +
+          '• 第 2 組配對：<b>' + id + '_P2_L.png</b> ↔ <b>' + id + '_P2_R.png</b>（依此類推 P3、P4…）';
+      }
+    }
+
+    function initChoiceRows(options, answer) {
+      const list = document.getElementById('ed-choice-list');
+      list.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      const optMap = {};
+      if (Array.isArray(options)) {
+        options.forEach(function (o) { optMap[o.id] = o; });
+      }
+
+      letters.forEach(function (letter) {
+        const data = optMap[letter] || { id: letter, text: '', image: '' };
+        const inputId = 'ed-opt-img-' + letter;
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5';
+        row.innerHTML =
+          '<label class="flex items-center gap-1.5 font-bold text-sm w-16 shrink-0 cursor-pointer">' +
+          '<input type="radio" name="ed-choice-ans" value="' + letter + '" ' + (answer === letter || (!answer && letter === 'A') ? 'checked' : '') + ' />' +
+          '<span>選項 ' + letter + '</span>' +
+          '</label>' +
+          '<input type="text" data-opt-text="' + letter + '" value="' + escapeAttr(data.text || '') + '" placeholder="選項文字（純圖片可留空）" class="flex-1 min-w-[160px] rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm" />' +
+          '<input id="' + inputId + '" type="text" data-opt-img="' + letter + '" value="' + escapeAttr(data.image || '') + '" placeholder="圖片網址（選填）" class="flex-1 min-w-[160px] rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm" />' +
+          '<button type="button" onclick="openPickerFor(\'' + inputId + '\')" class="shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">📁 挑選</button>';
+        list.appendChild(row);
+      });
+    }
+
+    let matchPairCounter = 0;
+    function initMatchRows(pairs) {
+      const list = document.getElementById('ed-match-list');
+      list.innerHTML = '';
+      matchPairCounter = 0;
+      const items = Array.isArray(pairs) && pairs.length >= 2
+        ? pairs
+        : [
+          { left: { text: '', image: '' }, right: { text: '', image: '' } },
+          { left: { text: '', image: '' }, right: { text: '', image: '' } },
+          { left: { text: '', image: '' }, right: { text: '', image: '' } }
+        ];
+      items.forEach(function (p) { addMatchPairRow(p); });
+    }
+
+    function addMatchPairRow(pairData) {
+      matchPairCounter++;
+      const idx = matchPairCounter;
+      const list = document.getElementById('ed-match-list');
+      const left = (pairData && pairData.left) || { text: '', image: '' };
+      const right = (pairData && pairData.right) || { text: '', image: '' };
+      const lImgId = 'ed-match-l-img-' + idx;
+      const rImgId = 'ed-match-r-img-' + idx;
+
+      const row = document.createElement('div');
+      row.className = 'match-pair-row grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-lg border border-slate-200 bg-slate-50 p-2.5';
+      row.innerHTML =
+        '<div class="sm:col-span-5 space-y-1.5">' +
+        '<input type="text" data-side="left-text" value="' + escapeAttr(left.text || '') + '" placeholder="左側文字" class="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs" />' +
+        '<div class="flex gap-1">' +
+        '<input id="' + lImgId + '" type="text" data-side="left-img" value="' + escapeAttr(left.image || '') + '" placeholder="左側圖片網址" class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs" />' +
+        '<button type="button" onclick="openPickerFor(\'' + lImgId + '\')" class="rounded border border-slate-300 bg-white px-2 text-xs font-bold hover:bg-slate-100">📁</button>' +
+        '</div>' +
+        '</div>' +
+        '<div class="sm:col-span-1 text-center text-slate-400 font-bold">↔</div>' +
+        '<div class="sm:col-span-5 space-y-1.5">' +
+        '<input type="text" data-side="right-text" value="' + escapeAttr(right.text || '') + '" placeholder="右側配對文字" class="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs" />' +
+        '<div class="flex gap-1">' +
+        '<input id="' + rImgId + '" type="text" data-side="right-img" value="' + escapeAttr(right.image || '') + '" placeholder="右側圖片網址" class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs" />' +
+        '<button type="button" onclick="openPickerFor(\'' + rImgId + '\')" class="rounded border border-slate-300 bg-white px-2 text-xs font-bold hover:bg-slate-100">📁</button>' +
+        '</div>' +
+        '</div>' +
+        '<div class="sm:col-span-1 text-right">' +
+        '<button type="button" onclick="this.closest(\'.match-pair-row\').remove()" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-2 py-1">刪除</button>' +
+        '</div>';
+      list.appendChild(row);
+    }
+
+    function saveCurrentQuestion() {
+      const id = document.getElementById('ed-id').value.trim();
+      const type = document.getElementById('ed-type').value;
+      const questionText = document.getElementById('ed-question-text').value.trim();
+      const questionImage = document.getElementById('ed-question-image').value.trim();
+
+      if (!id || !questionText) {
+        showStatus('請填寫題目 ID 與題目敘述文字', 'error');
+        return;
+      }
+
+      let content = null;
+      if (type === 'choice') {
+        const options = [];
+        ['A', 'B', 'C', 'D'].forEach(function (letter) {
+          const text = document.querySelector('[data-opt-text="' + letter + '"]').value.trim();
+          const image = document.querySelector('[data-opt-img="' + letter + '"]').value.trim();
+          if (text || image) {
+            options.push({ id: letter, text: text, image: image });
+          }
+        });
+        const checkedAns = document.querySelector('input[name="ed-choice-ans"]:checked');
+        const answer = checkedAns ? checkedAns.value : '';
+        if (options.length < 2 || !answer) {
+          showStatus('選擇題至少需填寫 2 個選項並勾選正確答案', 'error');
+          return;
+        }
+        content = { options: options, answer: answer };
+      } else {
+        const pairs = [];
+        document.querySelectorAll('.match-pair-row').forEach(function (row) {
+          const lt = row.querySelector('[data-side="left-text"]').value.trim();
+          const li = row.querySelector('[data-side="left-img"]').value.trim();
+          const rt = row.querySelector('[data-side="right-text"]').value.trim();
+          const ri = row.querySelector('[data-side="right-img"]').value.trim();
+          if ((lt || li) && (rt || ri)) {
+            pairs.push({ left: { text: lt, image: li }, right: { text: rt, image: ri } });
+          }
+        });
+        if (pairs.length < 2) {
+          showStatus('連連看至少需填寫 2 組完整配對', 'error');
+          return;
+        }
+        content = { pairs: pairs };
+      }
+
+      const btn = document.getElementById('save-question-btn');
+      btn.disabled = true;
+      showStatus('儲存題目中...', 'loading');
+
+      const qObj = {
+        id: id,
+        type: type,
+        question_text: questionText,
+        question_image: questionImage,
+        content: content
+      };
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false;
+          const idx = state.questions.findIndex(function (q) { return q.id === qObj.id; });
+          if (idx >= 0) {
+            state.questions[idx] = qObj;
+          } else {
+            state.questions.push(qObj);
+          }
+          populateQuestionSelect();
+          document.getElementById('ed-mode-select').value = qObj.id;
+          showStatus((res.action === 'updated' ? '已更新題目 ' : '已新增題目 ') + res.id, 'success');
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          showStatus('儲存失敗：' + err.message, 'error');
+        })
+        .saveQuestionToSheet(qObj);
+    }
+
+    // =========================================================================
+    // 分頁 2：Drive 圖片庫與快速改名
+    // =========================================================================
+    function loadDriveImages(saveSetting) {
+      const folderInput = document.getElementById('drive-folder-input').value.trim();
+      if (!folderInput) {
+        showStatus('請先輸入 Drive 資料夾 ID 或網址', 'error');
+        return;
+      }
+
+      showStatus('讀取 Drive 資料夾圖片中...', 'loading');
+
+      const proceedList = function (folderId) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            state.driveImages = res.images || [];
+            document.getElementById('drive-folder-meta').textContent =
+              '資料夾：「' + res.folderName + '」 (ID: ' + res.folderId + ')';
+            document.getElementById('drive-img-count').textContent = '共 ' + state.driveImages.length + ' 張圖片';
+            renderDriveImageGrid();
+            showStatus('已載入 ' + state.driveImages.length + ' 張圖片', 'success');
+          })
+          .withFailureHandler(function (err) {
+            showStatus('讀取 Drive 失敗：' + err.message, 'error');
+          })
+          .listDriveFolderImages(folderId);
+      };
+
+      if (saveSetting) {
+        google.script.run
+          .withSuccessHandler(function (cleanId) {
+            document.getElementById('drive-folder-input').value = cleanId;
+            state.settings.drive_folder_id = cleanId;
+            proceedList(cleanId);
+          })
+          .withFailureHandler(function (err) {
+            showStatus('儲存資料夾 ID 失敗：' + err.message, 'error');
+          })
+          .saveDriveFolderId(folderInput);
+      } else {
+        proceedList(folderInput);
+      }
+    }
+
+    function parseFilenameBadge(name) {
+      const base = name.replace(/\.[^.]+$/, '');
+      const parts = base.split('_');
+      if (parts.length < 2) return { ok: false, label: '未套用規範' };
+      const id = parts[0];
+      const role = parts[1].toUpperCase();
+      if (role === 'Q') return { ok: true, label: id + '・題目圖' };
+      if (/^[A-D]$/.test(role)) {
+        const isOk = parts[2] && parts[2].toUpperCase() === 'OK';
+        return { ok: true, label: id + '・選項 ' + role + (isOk ? ' (正解)' : '') };
+      }
+      if (/^P\d+$/.test(role) && parts[2] && /^(L|R)$/i.test(parts[2])) {
+        return { ok: true, label: id + '・' + role + '_' + parts[2].toUpperCase() };
+      }
+      return { ok: false, label: '未套用規範' };
+    }
+
+    function renderDriveImageGrid() {
+      const grid = document.getElementById('drive-image-grid');
+      if (state.driveImages.length === 0) {
+        grid.innerHTML = '<div class="col-span-full text-center py-12 text-sm text-slate-400">資料夾內目前沒有圖片檔案</div>';
+        return;
+      }
+
+      grid.innerHTML = '';
+      state.driveImages.forEach(function (img) {
+        const badge = parseFilenameBadge(img.name);
+        const isSelected = state.selectedFile && state.selectedFile.id === img.id;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'text-left rounded-xl border p-2 transition flex flex-col gap-1.5 ' +
+          (isSelected ? 'border-indigo-600 ring-2 ring-indigo-300 bg-indigo-50/40' : 'border-slate-200 bg-white hover:border-indigo-400');
+
+        card.innerHTML =
+          '<div class="aspect-square w-full overflow-hidden rounded-lg bg-slate-100 flex items-center justify-center">' +
+          '<img src="' + img.thumbUrl + '" alt="" class="w-full h-full object-contain" loading="lazy" />' +
+          '</div>' +
+          '<div class="text-[11px] font-bold text-slate-700 truncate w-full" title="' + escapeAttr(img.name) + '">' + escapeHtml(img.name) + '</div>' +
+          '<span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ' +
+          (badge.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') + '">' +
+          escapeHtml(badge.label) +
+          '</span>';
+
+        card.addEventListener('click', function () {
+          selectFileForRename(img);
+        });
+        grid.appendChild(card);
+      });
+    }
+
+    function selectFileForRename(img) {
+      state.selectedFile = img;
+      renderDriveImageGrid();
+
+      document.getElementById('rename-empty-hint').classList.add('hidden');
+      document.getElementById('rename-form').classList.remove('hidden');
+      document.getElementById('rn-thumb').src = img.thumbUrl;
+      document.getElementById('rn-old-name').textContent = img.name;
+      updateRenamePreview();
+    }
+
+    function updateRenamePreview() {
+      if (!state.selectedFile) return;
+
+      const prefix = document.getElementById('rn-prefix').value;
+      const num = (document.getElementById('rn-num').value || '01').trim();
+      const qId = prefix + num.padStart(2, '0');
+
+      const isChoice = prefix === 'Q';
+      document.getElementById('rn-choice-roles').classList.toggle('hidden', !isChoice);
+      document.getElementById('rn-match-roles').classList.toggle('hidden', isChoice);
+
+      const parts = [qId];
+      if (isChoice) {
+        const role = document.getElementById('rn-choice-role').value;
+        const showOk = role !== 'Q';
+        document.getElementById('rn-ok-wrap').classList.toggle('hidden', !showOk);
+        parts.push(role);
+        if (showOk && document.getElementById('rn-is-ok').checked) {
+          parts.push('OK');
+        }
+      } else {
+        const group = document.getElementById('rn-match-group').value;
+        document.getElementById('rn-match-side-wrap').classList.toggle('hidden', group === 'Q');
+        parts.push(group);
+        if (group !== 'Q') {
+          parts.push(document.getElementById('rn-match-side').value);
+        }
+      }
+
+      const rawLabel = document.getElementById('rn-label').value.trim().replace(/_/g, '-');
+      if (rawLabel) {
+        parts.push(rawLabel);
+      }
+
+      const extMatch = state.selectedFile.name.match(/(\.[^.]+)$/);
+      const ext = extMatch ? extMatch[1] : '';
+      document.getElementById('rn-new-name').value = parts.join('_') + ext;
+    }
+
+    function submitRenameFile() {
+      if (!state.selectedFile) return;
+      const newName = document.getElementById('rn-new-name').value.trim();
+      if (!newName) {
+        showStatus('新檔名不可為空', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('rn-submit-btn');
+      btn.disabled = true;
+      showStatus('修改 Drive 檔名中...', 'loading');
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false;
+          state.selectedFile.name = res.name;
+          document.getElementById('rn-old-name').textContent = res.name;
+          renderDriveImageGrid();
+          showStatus('已改名為 ' + res.name, 'success');
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          showStatus('改名失敗：' + err.message, 'error');
+        })
+        .renameDriveFile(state.selectedFile.id, newName);
+    }
+
+    function syncDriveToSheet() {
+      const folderInput = document.getElementById('drive-folder-input').value.trim();
+      if (!folderInput) {
+        showStatus('請先輸入 Drive 資料夾 ID 或網址', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('sync-drive-btn');
+      btn.disabled = true;
+      showStatus('正在依檔名解析並同步至 Questions...', 'loading');
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false;
+          showStatus('同步完成！新增 ' + res.added + ' 題、更新 ' + res.updated + ' 題（略過 ' + res.skippedFiles.length + ' 檔）', 'success');
+          loadInitData();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          showStatus('同步失敗：' + err.message, 'error');
+        })
+        .syncDriveImagesToQuestions(folderInput);
+    }
+
+    // =========================================================================
+    // 圖片挑選彈窗 (供題目編輯器使用)
+    // =========================================================================
+    function openPickerFor(inputId) {
+      state.pickerTargetInputId = inputId;
+      const modal = document.getElementById('picker-modal');
+      const body = document.getElementById('picker-body');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      if (state.driveImages.length === 0) {
+        body.innerHTML =
+          '<div class="col-span-full text-center py-8 space-y-3">' +
+          '<p class="text-sm text-slate-500">尚未載入 Drive 圖片清單，請先至「Drive 圖片庫與快速改名」分頁設定資料夾 ID 並載入圖片。</p>' +
+          '<button type="button" onclick="closePicker(); switchTab(\'drive\');" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white">前往設定資料夾</button>' +
+          '</div>';
+        return;
+      }
+
+      body.innerHTML = '';
+      state.driveImages.forEach(function (img) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'text-left rounded-xl border border-slate-200 p-2 hover:border-indigo-500 hover:bg-indigo-50/40 transition flex flex-col gap-1.5';
+        btn.innerHTML =
+          '<div class="aspect-square w-full overflow-hidden rounded-lg bg-slate-100">' +
+          '<img src="' + img.thumbUrl + '" alt="" class="w-full h-full object-contain" />' +
+          '</div>' +
+          '<div class="text-[11px] font-bold text-slate-700 truncate w-full">' + escapeHtml(img.name) + '</div>';
+        btn.addEventListener('click', function () {
+          const target = document.getElementById(state.pickerTargetInputId);
+          if (target) target.value = img.viewUrl;
+          closePicker();
+        });
+        body.appendChild(btn);
+      });
+    }
+
+    function closePicker() {
+      const modal = document.getElementById('picker-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+      return escapeHtml(str).replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+
+</html>

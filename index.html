@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>極速大挑戰</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+    .animate-shake {
+      animation: shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.85) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-pop-in {
+      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    /* 自訂捲軸美化 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500/30">
+  <!-- 背景層 -->
+  <div id="app-bg" class="fixed inset-0 -z-20 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 bg-cover bg-center bg-no-repeat transition-all duration-500"></div>
+  <div id="app-bg-overlay" class="fixed inset-0 -z-10 bg-slate-950/70 backdrop-blur-[2px] hidden"></div>
+
+  <!-- 頂部導覽列 -->
+  <header class="sticky top-0 z-30 border-b border-white/10 bg-slate-950/65 backdrop-blur-md">
+    <div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 sm:px-6">
+      <div class="flex items-center gap-3 min-w-0">
+        <div id="logo-container" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-500/25 overflow-hidden">
+          <!-- 預設閃電圖示 -->
+          <svg class="h-6 w-6 text-slate-950" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13 2L4.09 12.69a1 1 0 00.77 1.64H11l-1 7.67 8.91-10.69a1 1 0 00-.77-1.64H13l0-7.67z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 id="nav-title" class="truncate text-base font-bold tracking-wide text-white sm:text-lg">極速大挑戰</h1>
+        </div>
+      </div>
+
+      <!-- 實體靜音切換按鈕 -->
+      <button
+        id="mute-toggle-btn"
+        type="button"
+        class="flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-white/20 active:scale-95 sm:text-sm"
+        aria-label="切換音效"
+      >
+        <span id="mute-icon" class="text-base leading-none">🔊</span>
+        <span id="mute-label">音效開</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="mx-auto flex min-h-[calc(100vh-65px)] max-w-4xl flex-col items-center justify-center px-4 py-6 sm:px-6">
+    <!-- ==================== 1. 初始待機畫面 (STATE_START) ==================== -->
+    <section id="screen-start" class="w-full max-w-xl animate-pop-in">
+      <div class="rounded-3xl border border-white/15 bg-slate-900/75 p-7 text-center shadow-2xl backdrop-blur-xl sm:p-10">
+        <div class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 shadow-xl shadow-blue-500/30">
+          <svg class="h-11 w-11 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13 2L4.09 12.69a1 1 0 00.77 1.64H11l-1 7.67 8.91-10.69a1 1 0 00-.77-1.64H13l0-7.67z" />
+          </svg>
+        </div>
+
+        <h2 id="start-title" class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">極速大挑戰</h2>
+        <p id="start-subtitle" class="mt-3 text-base text-slate-300 sm:text-lg">累積答對 5 題過關・每題限時 10 秒</p>
+
+        <div class="mt-7 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
+          <div>
+            <div class="text-xs text-slate-400">題庫總題數</div>
+            <div id="start-total-count" class="mt-1 text-xl font-bold text-cyan-300">0 題</div>
+          </div>
+          <div class="border-x border-white/10">
+            <div class="text-xs text-slate-400">本局抽題</div>
+            <div id="start-pool-count" class="mt-1 text-xl font-bold text-amber-300">10 題</div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">過關門檻</div>
+            <div class="mt-1 text-xl font-bold text-emerald-300">5 題</div>
+          </div>
+        </div>
+
+        <div id="fallback-badge" class="mt-4 hidden rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+          目前使用內建示範題庫（尚未偵測到試算表自訂題目）
+        </div>
+
+        <button
+          id="start-btn"
+          type="button"
+          class="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 px-6 py-4 text-lg font-extrabold text-white shadow-xl shadow-blue-500/30 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          ⚡ 開始挑戰
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== 2. 作答進行畫面 (STATE_PLAYING / STATE_FEEDBACK) ==================== -->
+    <section id="screen-play" class="hidden w-full max-w-3xl">
+      <!-- 狀態 HUD -->
+      <div class="mb-4 rounded-2xl border border-white/15 bg-slate-900/75 p-4 shadow-xl backdrop-blur-xl">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span id="hud-question-num" class="rounded-lg bg-white/10 px-3 py-1 text-sm font-bold text-cyan-300">第 1 / 10 題</span>
+            <span id="hud-question-type" class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-300">選擇題</span>
+          </div>
+
+          <!-- 過關進度點 -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-slate-300">過關進度</span>
+            <div id="hud-progress-dots" class="flex items-center gap-1.5"></div>
+            <span id="hud-correct-text" class="ml-1 text-sm font-bold text-emerald-300">0 / 5</span>
+          </div>
+        </div>
+
+        <!-- 倒數計時條 -->
+        <div class="mt-3 flex items-center gap-3">
+          <div class="h-3 flex-1 overflow-hidden rounded-full bg-slate-800">
+            <div
+              id="timer-bar"
+              class="h-full w-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-[width] duration-100 ease-linear"
+            ></div>
+          </div>
+          <div id="timer-text" class="w-14 text-right font-mono text-base font-extrabold text-cyan-300">10.0s</div>
+        </div>
+      </div>
+
+      <!-- 題目主卡片 -->
+      <div class="relative rounded-3xl border border-white/15 bg-slate-900/80 p-5 shadow-2xl backdrop-blur-xl sm:p-7">
+        <!-- 題目文字與附圖 -->
+        <div class="mb-6">
+          <h3 id="question-text" class="text-xl font-bold leading-relaxed text-white sm:text-2xl"></h3>
+          <div id="question-image-wrap" class="mt-4 hidden overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
+            <img id="question-image" src="" alt="題目附圖" class="mx-auto max-h-64 w-auto object-contain" />
+          </div>
+        </div>
+
+        <!-- 作答區容器（選擇題或連連看動態渲染於此） -->
+        <div id="answer-area"></div>
+
+        <!-- 反饋橫幅 (STATE_FEEDBACK) -->
+        <div
+          id="feedback-banner"
+          class="pointer-events-none absolute inset-x-4 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-center"
+        >
+          <div id="feedback-banner-inner" class="animate-pop-in rounded-2xl border-2 px-6 py-4 text-center shadow-2xl backdrop-blur-md">
+            <div id="feedback-title" class="text-2xl font-extrabold sm:text-3xl"></div>
+            <div id="feedback-detail" class="mt-1 text-sm font-semibold sm:text-base"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. 結算畫面 (STATE_WIN / STATE_LOSE) ==================== -->
+    <section id="screen-result" class="hidden w-full max-w-lg animate-pop-in">
+      <div class="rounded-3xl border border-white/15 bg-slate-900/80 p-8 text-center shadow-2xl backdrop-blur-xl sm:p-10">
+        <div id="result-icon" class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl text-5xl shadow-xl"></div>
+        <h2 id="result-title" class="text-3xl font-extrabold text-white sm:text-4xl"></h2>
+        <p id="result-subtitle" class="mt-3 text-base text-slate-300"></p>
+
+        <div class="mt-7 grid grid-cols-2 gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div>
+            <div class="text-xs text-slate-400">答對題數</div>
+            <div id="result-correct" class="mt-1 text-2xl font-extrabold text-emerald-300">0 題</div>
+          </div>
+          <div class="border-l border-white/10">
+            <div class="text-xs text-slate-400">已作答題數</div>
+            <div id="result-answered" class="mt-1 text-2xl font-extrabold text-cyan-300">0 題</div>
+          </div>
+        </div>
+
+        <button
+          id="restart-btn"
+          type="button"
+          class="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 px-6 py-4 text-lg font-extrabold text-white shadow-xl shadow-blue-500/30 transition hover:brightness-110 active:scale-[0.98]"
+        >
+          🔄 再挑戰一次
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. 伺服端預先注入資料 (SSR Data Injection)
+    // =========================================================================
+    const INITIAL_DATA = <?!= initialData ?>;
+
+    // =========================================================================
+    // 2. 遊戲狀態機與常數定義
+    // =========================================================================
+    const STATE_START = 'STATE_START';
+    const STATE_PLAYING = 'STATE_PLAYING';
+    const STATE_FEEDBACK = 'STATE_FEEDBACK';
+    const STATE_WIN = 'STATE_WIN';
+    const STATE_LOSE = 'STATE_LOSE';
+
+    const TARGET_CORRECT = 5;
+    const MAX_POOL_SIZE = 10;
+    const QUESTION_TIME_SEC = 10.0;
+    const FEEDBACK_DURATION_MS = 1300;
+
+    // 連連看配對專屬高飽和漸層底色組
+    const MATCH_PALETTES = [
+      {
+        label: '組 A',
+        cardClass: 'border-emerald-400 bg-gradient-to-br from-emerald-500/45 to-teal-600/45 shadow-[0_0_20px_rgba(16,185,129,0.45)] ring-2 ring-emerald-400/70',
+        badgeClass: 'bg-emerald-400 text-slate-950'
+      },
+      {
+        label: '組 B',
+        cardClass: 'border-amber-400 bg-gradient-to-br from-amber-500/45 to-orange-600/45 shadow-[0_0_20px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/70',
+        badgeClass: 'bg-amber-400 text-slate-950'
+      },
+      {
+        label: '組 C',
+        cardClass: 'border-violet-400 bg-gradient-to-br from-violet-500/45 to-purple-600/45 shadow-[0_0_20px_rgba(139,92,246,0.45)] ring-2 ring-violet-400/70',
+        badgeClass: 'bg-violet-400 text-slate-950'
+      },
+      {
+        label: '組 D',
+        cardClass: 'border-cyan-400 bg-gradient-to-br from-cyan-500/45 to-sky-600/45 shadow-[0_0_20px_rgba(6,182,212,0.45)] ring-2 ring-cyan-400/70',
+        badgeClass: 'bg-cyan-400 text-slate-950'
+      },
+      {
+        label: '組 E',
+        cardClass: 'border-rose-400 bg-gradient-to-br from-rose-500/45 to-pink-600/45 shadow-[0_0_20px_rgba(244,63,94,0.45)] ring-2 ring-rose-400/70',
+        badgeClass: 'bg-rose-400 text-slate-950'
+      }
+    ];
+
+    const gameState = {
+      status: STATE_START,
+      allQuestions: Array.isArray(INITIAL_DATA.questions) ? INITIAL_DATA.questions : [],
+      settings: INITIAL_DATA.settings || {},
+      quizPool: [],
+      currentIndex: 0,
+      correctCount: 0,
+      answeredCount: 0,
+      timerId: null,
+      questionStartTime: 0,
+      lastTickSecond: null,
+      isLocked: false,
+      // 連連看互動狀態
+      matchState: {
+        shuffledRight: [],
+        selectedLeftIdx: null,
+        // pairs: [{ leftIdx, rightPos, paletteIdx }]
+        matchedPairs: []
+      }
+    };
+
+    // =========================================================================
+    // 3. 媒體資源處理與預載 (Media Pipeline)
+    // =========================================================================
+
+    /**
+     * 將 Google Drive 分享連結轉換為高解析直連圖床網址
+     * @param {string} url
+     * @returns {string}
+     */
+    function convertGoogleDriveLink(url) {
+      if (!url || typeof url !== 'string') return '';
+      const trimmed = url.trim();
+      if (!trimmed) return '';
+
+      const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileMatch && fileMatch[1]) {
+        return 'https://lh3.googleusercontent.com/d/' + fileMatch[1];
+      }
+
+      const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1] && trimmed.includes('drive.google.com')) {
+        return 'https://lh3.googleusercontent.com/d/' + idMatch[1];
+      }
+
+      return trimmed;
+    }
+
+    /**
+     * 預先載入本局抽出的最多 10 題所有圖片資源
+     * @param {Array<Object>} questions
+     */
+    function preloadQuizImages(questions) {
+      const urls = new Set();
+
+      questions.forEach(function (q) {
+        if (q.question_image) {
+          urls.add(convertGoogleDriveLink(q.question_image));
+        }
+        if (q.type === 'choice' && q.content && Array.isArray(q.content.options)) {
+          q.content.options.forEach(function (opt) {
+            if (opt && opt.image) {
+              urls.add(convertGoogleDriveLink(opt.image));
+            }
+          });
+        }
+        if (q.type === 'match' && q.content && Array.isArray(q.content.pairs)) {
+          q.content.pairs.forEach(function (pair) {
+            if (pair.left && pair.left.image) {
+              urls.add(convertGoogleDriveLink(pair.left.image));
+            }
+            if (pair.right && pair.right.image) {
+              urls.add(convertGoogleDriveLink(pair.right.image));
+            }
+          });
+        }
+      });
+
+      urls.forEach(function (src) {
+        if (!src) return;
+        const img = new Image();
+        img.src = src;
+      });
+    }
+
+    // =========================================================================
+    // 4. Web Audio API 音效引擎
+    // =========================================================================
+    const AudioEngine = (function () {
+      let ctx = null;
+      let isMuted = false;
+
+      function ensureContext() {
+        if (!ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            ctx = new AudioCtx();
+          }
+        }
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(function () {});
+        }
+        return ctx;
+      }
+
+      function playTone(freq, type, startOffset, duration, volume) {
+        const audioCtx = ensureContext();
+        if (!audioCtx || isMuted) return;
+
+        const now = audioCtx.currentTime + startOffset;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      }
+
+      return {
+        unlock: function () {
+          ensureContext();
+        },
+        toggleMute: function () {
+          isMuted = !isMuted;
+          return isMuted;
+        },
+        getMuted: function () {
+          return isMuted;
+        },
+        play: function (name) {
+          if (isMuted) return;
+          switch (name) {
+            case 'click':
+              // 800Hz 短促清脆正弦波 (0.05s)
+              playTone(800, 'sine', 0, 0.05, 0.18);
+              break;
+            case 'correct':
+              // C5 -> E5 -> G5 上行大三和弦琶音
+              playTone(523.25, 'triangle', 0, 0.14, 0.22);
+              playTone(659.25, 'triangle', 0.08, 0.14, 0.22);
+              playTone(783.99, 'triangle', 0.16, 0.24, 0.25);
+              break;
+            case 'wrong':
+              // A3 -> F3 下行鋸齒波雙音低鳴
+              playTone(220.0, 'sawtooth', 0, 0.16, 0.14);
+              playTone(174.61, 'sawtooth', 0.14, 0.26, 0.14);
+              break;
+            case 'tick':
+              // 1000Hz 高頻短音
+              playTone(1000, 'sine', 0, 0.06, 0.16);
+              break;
+            case 'win':
+              // C5 - E5 - G5 - C6 勝利和弦連奏
+              playTone(523.25, 'triangle', 0, 0.15, 0.24);
+              playTone(659.25, 'triangle', 0.11, 0.15, 0.24);
+              playTone(783.99, 'triangle', 0.22, 0.15, 0.24);
+              playTone(1046.5, 'triangle', 0.34, 0.48, 0.28);
+              break;
+          }
+        }
+      };
+    })();
+
+    // =========================================================================
+    // 5. 工具函式與 DOM 參照
+    // =========================================================================
+    const el = {
+      appBg: document.getElementById('app-bg'),
+      appBgOverlay: document.getElementById('app-bg-overlay'),
+      logoContainer: document.getElementById('logo-container'),
+      navTitle: document.getElementById('nav-title'),
+      muteToggleBtn: document.getElementById('mute-toggle-btn'),
+      muteIcon: document.getElementById('mute-icon'),
+      muteLabel: document.getElementById('mute-label'),
+
+      screenStart: document.getElementById('screen-start'),
+      startTitle: document.getElementById('start-title'),
+      startSubtitle: document.getElementById('start-subtitle'),
+      startTotalCount: document.getElementById('start-total-count'),
+      startPoolCount: document.getElementById('start-pool-count'),
+      fallbackBadge: document.getElementById('fallback-badge'),
+      startBtn: document.getElementById('start-btn'),
+
+      screenPlay: document.getElementById('screen-play'),
+      hudQuestionNum: document.getElementById('hud-question-num'),
+      hudQuestionType: document.getElementById('hud-question-type'),
+      hudProgressDots: document.getElementById('hud-progress-dots'),
+      hudCorrectText: document.getElementById('hud-correct-text'),
+      timerBar: document.getElementById('timer-bar'),
+      timerText: document.getElementById('timer-text'),
+      questionText: document.getElementById('question-text'),
+      questionImageWrap: document.getElementById('question-image-wrap'),
+      questionImage: document.getElementById('question-image'),
+      answerArea: document.getElementById('answer-area'),
+      feedbackBanner: document.getElementById('feedback-banner'),
+      feedbackBannerInner: document.getElementById('feedback-banner-inner'),
+      feedbackTitle: document.getElementById('feedback-title'),
+      feedbackDetail: document.getElementById('feedback-detail'),
+
+      screenResult: document.getElementById('screen-result'),
+      resultIcon: document.getElementById('result-icon'),
+      resultTitle: document.getElementById('result-title'),
+      resultSubtitle: document.getElementById('result-subtitle'),
+      resultCorrect: document.getElementById('result-correct'),
+      resultAnswered: document.getElementById('result-answered'),
+      restartBtn: document.getElementById('restart-btn')
+    };
+
+    /**
+     * Fisher-Yates 洗牌演算法（回傳新陣列）
+     */
+    function shuffleArray(list) {
+      const arr = list.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+      }
+      return arr;
+    }
+
+    /**
+     * 切換顯示畫面
+     */
+    function showScreen(screenName) {
+      el.screenStart.classList.add('hidden');
+      el.screenPlay.classList.add('hidden');
+      el.screenResult.classList.add('hidden');
+
+      if (screenName === 'start') el.screenStart.classList.remove('hidden');
+      if (screenName === 'play') el.screenPlay.classList.remove('hidden');
+      if (screenName === 'result') el.screenResult.classList.remove('hidden');
+    }
+
+    // =========================================================================
+    // 6. 初始化視覺與事件綁定
+    // =========================================================================
+    function initApp() {
+      const s = gameState.settings;
+      const appTitle = s.app_title || '極速大挑戰';
+      const subTitle = s.sub_title || '累積答對 5 題過關・每題限時 10 秒';
+
+      document.title = appTitle;
+      el.navTitle.textContent = appTitle;
+      el.startTitle.textContent = appTitle;
+      el.startSubtitle.textContent = subTitle;
+
+      // 背景圖片設定
+      const bgUrl = convertGoogleDriveLink(s.bg_image);
+      if (bgUrl) {
+        el.appBg.style.backgroundImage = 'url("' + bgUrl + '")';
+        el.appBgOverlay.classList.remove('hidden');
+      }
+
+      // Logo 圖片設定
+      const logoUrl = convertGoogleDriveLink(s.logo_image);
+      if (logoUrl) {
+        el.logoContainer.innerHTML = '';
+        el.logoContainer.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 overflow-hidden border border-white/15';
+        const img = document.createElement('img');
+        img.src = logoUrl;
+        img.alt = appTitle;
+        img.className = 'h-full w-full object-cover';
+        el.logoContainer.appendChild(img);
+      }
+
+      // 題庫資訊
+      const total = gameState.allQuestions.length;
+      const poolSize = Math.min(MAX_POOL_SIZE, total);
+      el.startTotalCount.textContent = total + ' 題';
+      el.startPoolCount.textContent = poolSize + ' 題';
+
+      if (INITIAL_DATA.isFallback) {
+        el.fallbackBadge.classList.remove('hidden');
+      }
+
+      if (total === 0) {
+        el.startBtn.disabled = true;
+        el.startBtn.textContent = '目前無可用題目';
+      }
+
+      // 綁定按鈕事件
+      el.muteToggleBtn.addEventListener('click', function () {
+        AudioEngine.unlock();
+        const muted = AudioEngine.toggleMute();
+        el.muteIcon.textContent = muted ? '🔇' : '🔊';
+        el.muteLabel.textContent = muted ? '靜音' : '音效開';
+        if (!muted) {
+          AudioEngine.play('click');
+        }
+      });
+
+      el.startBtn.addEventListener('click', startGame);
+      el.restartBtn.addEventListener('click', function () {
+        AudioEngine.play('click');
+        startGame();
+      });
+    }
+
+    // =========================================================================
+    // 7. 遊戲流程控制
+    // =========================================================================
+    function startGame() {
+      AudioEngine.unlock();
+      AudioEngine.play('click');
+
+      const shuffled = shuffleArray(gameState.allQuestions);
+      gameState.quizPool = shuffled.slice(0, MAX_POOL_SIZE);
+      gameState.currentIndex = 0;
+      gameState.correctCount = 0;
+      gameState.answeredCount = 0;
+      gameState.isLocked = false;
+
+      // 背景預載本局 10 題所有圖片
+      preloadQuizImages(gameState.quizPool);
+
+      showScreen('play');
+      loadCurrentQuestion();
+    }
+
+    function stopTimer() {
+      if (gameState.timerId !== null) {
+        clearInterval(gameState.timerId);
+        gameState.timerId = null;
+      }
+    }
+
+    function updateProgressHUD() {
+      const totalPool = gameState.quizPool.length;
+      const currentQ = gameState.quizPool[gameState.currentIndex];
+
+      el.hudQuestionNum.textContent = '第 ' + (gameState.currentIndex + 1) + ' / ' + totalPool + ' 題';
+      el.hudQuestionType.textContent = currentQ.type === 'match' ? '連連看' : '選擇題';
+      el.hudCorrectText.textContent = gameState.correctCount + ' / ' + TARGET_CORRECT;
+
+      el.hudProgressDots.innerHTML = '';
+      for (let i = 0; i < TARGET_CORRECT; i++) {
+        const dot = document.createElement('span');
+        const filled = i < gameState.correctCount;
+        dot.className = 'h-2.5 w-2.5 rounded-full transition-all duration-300 ' +
+          (filled ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] scale-110' : 'bg-slate-700');
+        el.hudProgressDots.appendChild(dot);
+      }
+    }
+
+    function loadCurrentQuestion() {
+      stopTimer();
+      gameState.status = STATE_PLAYING;
+      gameState.isLocked = false;
+      gameState.lastTickSecond = null;
+
+      el.feedbackBanner.classList.add('hidden');
+      el.feedbackBanner.classList.remove('flex');
+
+      const q = gameState.quizPool[gameState.currentIndex];
+      updateProgressHUD();
+
+      // 題目文字與圖片
+      el.questionText.textContent = q.question_text;
+      const qImgUrl = convertGoogleDriveLink(q.question_image);
+      if (qImgUrl) {
+        el.questionImage.src = qImgUrl;
+        el.questionImageWrap.classList.remove('hidden');
+      } else {
+        el.questionImage.src = '';
+        el.questionImageWrap.classList.add('hidden');
+      }
+
+      // 渲染題型互動介面
+      if (q.type === 'choice') {
+        renderChoiceQuestion(q);
+      } else if (q.type === 'match') {
+        renderMatchQuestion(q);
+      }
+
+      startQuestionTimer();
+    }
+
+    function startQuestionTimer() {
+      gameState.questionStartTime = Date.now();
+      updateTimerUI(QUESTION_TIME_SEC);
+
+      gameState.timerId = setInterval(function () {
+        if (gameState.status !== STATE_PLAYING) return;
+
+        const elapsed = (Date.now() - gameState.questionStartTime) / 1000;
+        const timeLeft = Math.max(0, QUESTION_TIME_SEC - elapsed);
+        updateTimerUI(timeLeft);
+
+        if (timeLeft <= 3.0 && timeLeft > 0) {
+          const secCeil = Math.ceil(timeLeft);
+          if (gameState.lastTickSecond !== secCeil) {
+            gameState.lastTickSecond = secCeil;
+            AudioEngine.play('tick');
+          }
+        }
+
+        if (timeLeft <= 0) {
+          handleTimeout();
+        }
+      }, 100);
+    }
+
+    function updateTimerUI(timeLeft) {
+      const pct = Math.max(0, Math.min(100, (timeLeft / QUESTION_TIME_SEC) * 100));
+      el.timerBar.style.width = pct.toFixed(1) + '%';
+      el.timerText.textContent = timeLeft.toFixed(1) + 's';
+
+      if (timeLeft <= 3.0) {
+        el.timerBar.className = 'h-full rounded-full bg-gradient-to-r from-rose-500 to-red-600 transition-[width] duration-100 ease-linear';
+        el.timerText.className = 'w-14 text-right font-mono text-base font-extrabold text-rose-400 animate-pulse';
+      } else {
+        el.timerBar.className = 'h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-[width] duration-100 ease-linear';
+        el.timerText.className = 'w-14 text-right font-mono text-base font-extrabold text-cyan-300';
+      }
+    }
+
+    // =========================================================================
+    // 8. 選擇題渲染與判定
+    // =========================================================================
+    function renderChoiceQuestion(q) {
+      el.answerArea.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4';
+
+      q.content.options.forEach(function (opt) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.optionId = opt.id;
+        btn.className = 'choice-btn group flex flex-col justify-center rounded-2xl border-2 border-white/15 bg-white/5 p-4 text-left transition duration-150 hover:border-cyan-400/70 hover:bg-white/10 active:scale-[0.98]';
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center gap-3';
+
+        const badge = document.createElement('span');
+        badge.className = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-extrabold text-cyan-300 group-hover:bg-cyan-400 group-hover:text-slate-950 transition';
+        badge.textContent = opt.id;
+        header.appendChild(badge);
+
+        if (opt.text) {
+          const textSpan = document.createElement('span');
+          textSpan.className = 'text-base font-semibold text-slate-100 leading-snug';
+          textSpan.textContent = opt.text;
+          header.appendChild(textSpan);
+        }
+
+        btn.appendChild(header);
+
+        const optImgUrl = convertGoogleDriveLink(opt.image);
+        if (optImgUrl) {
+          const imgWrap = document.createElement('div');
+          imgWrap.className = 'mt-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/50';
+          const img = document.createElement('img');
+          img.src = optImgUrl;
+          img.alt = '選項 ' + opt.id;
+          img.className = 'mx-auto max-h-36 w-auto object-contain';
+          imgWrap.appendChild(img);
+          btn.appendChild(imgWrap);
+        }
+
+        btn.addEventListener('click', function () {
+          handleChoiceSelect(opt.id);
+        });
+
+        grid.appendChild(btn);
+      });
+
+      el.answerArea.appendChild(grid);
+    }
+
+    function handleChoiceSelect(selectedId) {
+      if (gameState.isLocked || gameState.status !== STATE_PLAYING) return;
+
+      stopTimer();
+      gameState.isLocked = true;
+      gameState.status = STATE_FEEDBACK;
+      gameState.answeredCount++;
+
+      const q = gameState.quizPool[gameState.currentIndex];
+      const correctId = String(q.content.answer).trim();
+      const isCorrect = selectedId === correctId;
+
+      if (isCorrect) {
+        gameState.correctCount++;
+        AudioEngine.play('correct');
+      } else {
+        AudioEngine.play('wrong');
+      }
+
+      // 套用選項視覺反饋
+      const buttons = el.answerArea.querySelectorAll('.choice-btn');
+      buttons.forEach(function (btn) {
+        btn.disabled = true;
+        const oid = btn.dataset.optionId;
+        if (oid === correctId) {
+          btn.className = 'choice-btn flex flex-col justify-center rounded-2xl border-2 border-emerald-400 bg-emerald-500/25 p-4 text-left shadow-[0_0_20px_rgba(16,185,129,0.4)]';
+        } else if (oid === selectedId && !isCorrect) {
+          btn.className = 'choice-btn animate-shake flex flex-col justify-center rounded-2xl border-2 border-rose-500 bg-rose-500/25 p-4 text-left shadow-[0_0_20px_rgba(244,63,94,0.4)]';
+        } else {
+          btn.className = 'choice-btn flex flex-col justify-center rounded-2xl border-2 border-white/10 bg-white/5 p-4 text-left opacity-45';
+        }
+      });
+
+      showFeedbackBanner(
+        isCorrect,
+        isCorrect ? '答對了！' : '答錯了！',
+        isCorrect ? '太棒了，繼續保持！' : '正確答案為 ' + correctId
+      );
+
+      updateProgressHUD();
+      scheduleNextStep();
+    }
+
+    // =========================================================================
+    // 9. 連連看渲染與點擊配對互動
+    // =========================================================================
+    function renderMatchQuestion(q) {
+      const pairs = q.content.pairs;
+
+      // 右側項目於渲染時隨機打亂順序
+      const rightItems = pairs.map(function (pair, idx) {
+        return { pairIndex: idx, item: pair.right };
+      });
+
+      gameState.matchState = {
+        shuffledRight: shuffleArray(rightItems),
+        selectedLeftIdx: null,
+        matchedPairs: []
+      };
+
+      const hint = document.createElement('p');
+      hint.className = 'mb-3 text-xs font-medium text-cyan-300/90 sm:text-sm';
+      hint.textContent = '💡 請先點擊左側卡片，再點擊對應的右側卡片完成配對（點擊已配對卡片可解除重選）';
+
+      const columns = document.createElement('div');
+      columns.className = 'grid grid-cols-2 gap-3 sm:gap-5';
+
+      const leftCol = document.createElement('div');
+      leftCol.id = 'match-left-col';
+      leftCol.className = 'flex flex-col gap-3';
+
+      const rightCol = document.createElement('div');
+      rightCol.id = 'match-right-col';
+      rightCol.className = 'flex flex-col gap-3';
+
+      pairs.forEach(function (pair, idx) {
+        const card = createMatchCardElement('left', idx, pair.left);
+        card.addEventListener('click', function () {
+          handleMatchLeftClick(idx);
+        });
+        leftCol.appendChild(card);
+      });
+
+      gameState.matchState.shuffledRight.forEach(function (entry, pos) {
+        const card = createMatchCardElement('right', pos, entry.item);
+        card.addEventListener('click', function () {
+          handleMatchRightClick(pos);
+        });
+        rightCol.appendChild(card);
+      });
+
+      columns.appendChild(leftCol);
+      columns.appendChild(rightCol);
+
+      el.answerArea.innerHTML = '';
+      el.answerArea.appendChild(hint);
+      el.answerArea.appendChild(columns);
+    }
+
+    function createMatchCardElement(side, index, itemData) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.side = side;
+      btn.dataset.index = String(index);
+      btn.className = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 border-white/15 bg-white/5 p-3 text-center transition-all duration-150 hover:border-white/35 hover:bg-white/10 active:scale-[0.98]';
+
+      // 配對標章容器
+      const badge = document.createElement('span');
+      badge.className = 'match-badge hidden absolute -top-2.5 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow';
+      btn.appendChild(badge);
+
+      const imgUrl = convertGoogleDriveLink(itemData && itemData.image);
+      if (imgUrl) {
+        const img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = (itemData && itemData.text) || '配對圖片';
+        img.className = 'mb-1.5 max-h-20 w-auto rounded-lg object-contain';
+        btn.appendChild(img);
+      }
+
+      if (itemData && itemData.text) {
+        const text = document.createElement('span');
+        text.className = 'text-sm font-bold text-slate-100 sm:text-base leading-snug';
+        text.textContent = itemData.text;
+        btn.appendChild(text);
+      }
+
+      return btn;
+    }
+
+    function handleMatchLeftClick(leftIdx) {
+      if (gameState.isLocked || gameState.status !== STATE_PLAYING) return;
+      AudioEngine.play('click');
+
+      const ms = gameState.matchState;
+      const existingIdx = ms.matchedPairs.findIndex(function (p) {
+        return p.leftIdx === leftIdx;
+      });
+
+      // 若已配對，點擊即解除該組配對
+      if (existingIdx !== -1) {
+        ms.matchedPairs.splice(existingIdx, 1);
+        ms.selectedLeftIdx = null;
+        refreshMatchCardsUI();
+        return;
+      }
+
+      // 切換或取消左側藍色霓虹高亮選取
+      ms.selectedLeftIdx = (ms.selectedLeftIdx === leftIdx) ? null : leftIdx;
+      refreshMatchCardsUI();
+    }
+
+    function handleMatchRightClick(rightPos) {
+      if (gameState.isLocked || gameState.status !== STATE_PLAYING) return;
+
+      const ms = gameState.matchState;
+      const existingIdx = ms.matchedPairs.findIndex(function (p) {
+        return p.rightPos === rightPos;
+      });
+
+      // 若已配對，點擊即解除該組配對
+      if (existingIdx !== -1) {
+        AudioEngine.play('click');
+        ms.matchedPairs.splice(existingIdx, 1);
+        refreshMatchCardsUI();
+        return;
+      }
+
+      // 若尚未選取左側卡片，不執行配對
+      if (ms.selectedLeftIdx === null) {
+        return;
+      }
+
+      AudioEngine.play('click');
+
+      // 尋找下一個未使用的調色盤索引
+      const usedPaletteIndices = new Set(ms.matchedPairs.map(function (p) { return p.paletteIdx; }));
+      let paletteIdx = 0;
+      while (usedPaletteIndices.has(paletteIdx)) {
+        paletteIdx++;
+      }
+
+      ms.matchedPairs.push({
+        leftIdx: ms.selectedLeftIdx,
+        rightPos: rightPos,
+        paletteIdx: paletteIdx % MATCH_PALETTES.length
+      });
+      ms.selectedLeftIdx = null;
+      refreshMatchCardsUI();
+
+      // 檢查是否已全數配對完成 -> 自動結算
+      const q = gameState.quizPool[gameState.currentIndex];
+      if (ms.matchedPairs.length === q.content.pairs.length) {
+        evaluateMatchAnswer();
+      }
+    }
+
+    function refreshMatchCardsUI() {
+      const ms = gameState.matchState;
+      const defaultClass = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 border-white/15 bg-white/5 p-3 text-center transition-all duration-150 hover:border-white/35 hover:bg-white/10 active:scale-[0.98]';
+      const activeLeftClass = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 border-cyan-400 bg-cyan-500/25 p-3 text-center transition-all duration-150 scale-[1.03] ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(34,211,238,0.6)]';
+
+      const leftCards = document.querySelectorAll('#match-left-col .match-card');
+      leftCards.forEach(function (card) {
+        const idx = Number(card.dataset.index);
+        const badge = card.querySelector('.match-badge');
+        const pair = ms.matchedPairs.find(function (p) { return p.leftIdx === idx; });
+
+        if (pair) {
+          const palette = MATCH_PALETTES[pair.paletteIdx];
+          card.className = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 p-3 text-center transition-all duration-150 ' + palette.cardClass;
+          badge.textContent = palette.label;
+          badge.className = 'match-badge absolute -top-2.5 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow ' + palette.badgeClass;
+        } else if (ms.selectedLeftIdx === idx) {
+          card.className = activeLeftClass;
+          badge.className = 'match-badge hidden';
+        } else {
+          card.className = defaultClass;
+          badge.className = 'match-badge hidden';
+        }
+      });
+
+      const rightCards = document.querySelectorAll('#match-right-col .match-card');
+      rightCards.forEach(function (card) {
+        const pos = Number(card.dataset.index);
+        const badge = card.querySelector('.match-badge');
+        const pair = ms.matchedPairs.find(function (p) { return p.rightPos === pos; });
+
+        if (pair) {
+          const palette = MATCH_PALETTES[pair.paletteIdx];
+          card.className = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 p-3 text-center transition-all duration-150 ' + palette.cardClass;
+          badge.textContent = palette.label;
+          badge.className = 'match-badge absolute -top-2.5 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow ' + palette.badgeClass;
+        } else {
+          card.className = defaultClass;
+          badge.className = 'match-badge hidden';
+        }
+      });
+    }
+
+    function evaluateMatchAnswer() {
+      stopTimer();
+      gameState.isLocked = true;
+      gameState.status = STATE_FEEDBACK;
+      gameState.answeredCount++;
+
+      const ms = gameState.matchState;
+      let allCorrect = true;
+
+      ms.matchedPairs.forEach(function (pair) {
+        const rightEntry = ms.shuffledRight[pair.rightPos];
+        const isPairCorrect = rightEntry && (rightEntry.pairIndex === pair.leftIdx);
+        if (!isPairCorrect) {
+          allCorrect = false;
+        }
+
+        const leftCard = document.querySelector('#match-left-col .match-card[data-index="' + pair.leftIdx + '"]');
+        const rightCard = document.querySelector('#match-right-col .match-card[data-index="' + pair.rightPos + '"]');
+
+        const statusClass = isPairCorrect
+          ? 'border-emerald-400 bg-emerald-500/25 shadow-[0_0_20px_rgba(16,185,129,0.45)]'
+          : 'animate-shake border-rose-500 bg-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.45)]';
+
+        if (leftCard) {
+          leftCard.className = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 p-3 text-center ' + statusClass;
+        }
+        if (rightCard) {
+          rightCard.className = 'match-card relative flex min-h-[72px] flex-col items-center justify-center rounded-2xl border-2 p-3 text-center ' + statusClass;
+        }
+      });
+
+      if (allCorrect) {
+        gameState.correctCount++;
+        AudioEngine.play('correct');
+        showFeedbackBanner(true, '全數配對正確！', '眼明手快，漂亮過關一題！');
+      } else {
+        AudioEngine.play('wrong');
+        showFeedbackBanner(false, '配對有誤！', '紅色標示為配對錯誤的組別');
+      }
+
+      updateProgressHUD();
+      scheduleNextStep();
+    }
+
+    // =========================================================================
+    // 10. 逾時與反饋結算控制
+    // =========================================================================
+    function handleTimeout() {
+      if (gameState.isLocked || gameState.status !== STATE_PLAYING) return;
+
+      stopTimer();
+      gameState.isLocked = true;
+      gameState.status = STATE_FEEDBACK;
+      gameState.answeredCount++;
+
+      AudioEngine.play('wrong');
+
+      const q = gameState.quizPool[gameState.currentIndex];
+      let detailMsg = '作答時間已結束';
+
+      if (q.type === 'choice') {
+        const correctId = String(q.content.answer).trim();
+        detailMsg = '正確答案為 ' + correctId;
+        const buttons = el.answerArea.querySelectorAll('.choice-btn');
+        buttons.forEach(function (btn) {
+          btn.disabled = true;
+          if (btn.dataset.optionId === correctId) {
+            btn.className = 'choice-btn flex flex-col justify-center rounded-2xl border-2 border-emerald-400 bg-emerald-500/25 p-4 text-left shadow-[0_0_20px_rgba(16,185,129,0.4)]';
+          } else {
+            btn.className = 'choice-btn flex flex-col justify-center rounded-2xl border-2 border-white/10 bg-white/5 p-4 text-left opacity-45';
+          }
+        });
+      }
+
+      showFeedbackBanner(false, '時間到！', detailMsg);
+      scheduleNextStep();
+    }
+
+    function showFeedbackBanner(isSuccess, title, detail) {
+      el.feedbackTitle.textContent = title;
+      el.feedbackDetail.textContent = detail || '';
+
+      if (isSuccess) {
+        el.feedbackBannerInner.className = 'animate-pop-in rounded-2xl border-2 border-emerald-400 bg-emerald-950/90 px-7 py-4 text-center text-emerald-200 shadow-2xl backdrop-blur-md';
+      } else {
+        el.feedbackBannerInner.className = 'animate-pop-in rounded-2xl border-2 border-rose-400 bg-rose-950/90 px-7 py-4 text-center text-rose-200 shadow-2xl backdrop-blur-md';
+      }
+
+      el.feedbackBanner.classList.remove('hidden');
+      el.feedbackBanner.classList.add('flex');
+    }
+
+    function scheduleNextStep() {
+      setTimeout(function () {
+        if (gameState.correctCount >= TARGET_CORRECT) {
+          enterResultState(true);
+        } else if (gameState.currentIndex + 1 >= gameState.quizPool.length) {
+          enterResultState(false);
+        } else {
+          gameState.currentIndex++;
+          loadCurrentQuestion();
+        }
+      }, FEEDBACK_DURATION_MS);
+    }
+
+    function enterResultState(isWin) {
+      stopTimer();
+      gameState.status = isWin ? STATE_WIN : STATE_LOSE;
+      showScreen('result');
+
+      el.resultCorrect.textContent = gameState.correctCount + ' 題';
+      el.resultAnswered.textContent = gameState.answeredCount + ' 題';
+
+      if (isWin) {
+        el.resultIcon.textContent = '🏆';
+        el.resultIcon.className = 'mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-5xl shadow-xl shadow-amber-500/30';
+        el.resultTitle.textContent = '恭喜挑戰成功！';
+        el.resultSubtitle.textContent = '你成功累積答對 ' + TARGET_CORRECT + ' 題，完成極速挑戰！';
+        AudioEngine.play('win');
+        launchConfetti();
+      } else {
+        el.resultIcon.textContent = '💪';
+        el.resultIcon.className = 'mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 text-5xl shadow-xl';
+        el.resultTitle.textContent = '挑戰未過關';
+        el.resultSubtitle.textContent = '候選題目已全數作答完畢，再接再厲！';
+      }
+    }
+
+    function launchConfetti() {
+      if (typeof confetti !== 'function') return;
+      confetti({
+        particleCount: 110,
+        spread: 75,
+        origin: { y: 0.6 }
+      });
+      setTimeout(function () {
+        confetti({
+          particleCount: 70,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 }
+        });
+        confetti({
+          particleCount: 70,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 }
+        });
+      }, 250);
+    }
+
+    // 啟動應用程式
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
